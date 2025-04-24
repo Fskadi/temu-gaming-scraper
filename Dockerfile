@@ -1,14 +1,12 @@
-FROM node:18
+FROM ghcr.io/puppeteer/puppeteer:latest
 
-# Creează folder pentru app
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Copiază fișierele proiectului
 COPY package*.json ./
 RUN npm install
 
 COPY . .
 
-# Expune portul (Render folosește automat variabila PORT)
-EXPOSE 10000
+EXPOSE 3000
+
 CMD [ "node", "index.js" ]
