@@ -1,28 +1,42 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 
 (async () => {
-  const browser = await puppeteer.launch({ headless: true });
-  const page = await browser.newPage();
-  await page.goto('https://www.temu.com/ro', { timeout: 60000, waitUntil: 'domcontentloaded' });
-
-  // Așteaptă să încarce cardurile de produs
-  await page.waitForSelector('div._6q6qVUF5._1UrrHYym', { timeout: 60000 });
-
-  const produse = await page.evaluate(() => {
-    const carduri = Array.from(document.querySelectorAll('div._6q6qVUF5._1UrrHYym'));
-
-    return carduri.map(card => {
-      const titlu = card.querySelector('h3._2BvQbnbN')?.innerText ?? 'Fără titlu';
-      const pretInt = card.querySelector('div._382YgpSF span._2de9ERAH')?.innerText ?? '0';
-      const pretDec = card.querySelector('div._382YgpSF span._3SrxhhHh')?.innerText ?? '00';
-      const pret = `${pretInt},${pretDec} Lei`;
-
-      const imagine = card.querySelector('img.goods-img-external')?.src ?? '';
-
-      return { titlu, pret, imagine };
-    });
+  const browser = await puppeteer.launch({
+    headless: true,
+    executablePath: '/usr/bin/google-chrome-stable',
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 
-  console.log(produse);
+  const page = await browser.newPage();
+  await page.goto('https://www.temu.com', { waitUntil: 'domcontentloaded', timeout: 0 });
+
+  // Accept cookies / pop-up
+  try {
+    await page.click('button:has-text("Accept")', { timeout: 5000 });
+  } catch (e) {}
+
+  // Scroll puțin
+  await page.evaluate(() => window.scrollBy(0, 1000));
+  await page.waitForTimeout(2000);
+
+  // Selector mai sigur: linkuri cu href ce conțin "/goods"
+  await page.waitForSelector('a[href*="/goods"]', { timeout: 30000 });
+
+  const products = await page.$$eval('a[href*="/goods"]', (links) => {
+    const items = [];
+    for (const link of links) {
+      const title = link.querySelector('div')?.innerText || 'Fără titlu';
+      const price = link.innerText.match(/(\$\d+(\.\d+)?)/)?.[0] || 'Fără preț';
+      const href = link.href;
+
+      if (title && price && href && items.length < 10) {
+        items.push({ title, price, link: href });
+      }
+    }
+    return items;
+  });
+
+  console.log(products);
+
   await browser.close();
 })();
